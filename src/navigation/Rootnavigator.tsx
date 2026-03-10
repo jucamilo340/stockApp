@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Text, ActivityIndicator, View, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@auth/useAuth';
 import { useWatchlistSocket } from '@hooks/useStockSocket';
 import { useAlertChecker } from '@hooks/useAlerts';
@@ -31,6 +32,8 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
 }
 
 function MainTabs() {
+  const insets = useSafeAreaInsets();
+
   useEffect(() => {
     finnhubSocket.connect(FINNHUB_API_KEY);
 
@@ -49,9 +52,9 @@ function MainTabs() {
         tabBarStyle: {
           backgroundColor: '#0D0D1A',
           borderTopColor: '#1E1E2E',
-          paddingBottom: 8,
+          paddingBottom: Math.max(insets.bottom, 8),
           paddingTop: 8,
-          height: 64,
+          height: 56 + Math.max(insets.bottom, 8),
         },
         tabBarActiveTintColor: '#00C805',
         tabBarInactiveTintColor: '#444',

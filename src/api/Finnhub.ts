@@ -43,7 +43,6 @@ export const finnhubApi = {
     const { data } = await finnhubClient.get<StockQuote>('/quote', {
       params: { symbol },
     });
-    console.log('data', data)
     return data;
   },
 

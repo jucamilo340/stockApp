@@ -11,6 +11,7 @@ export function useAlertChecker(): void {
   const notifiedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    console.log('entraa')
     alerts.forEach(async (alert) => {
       if (alert.triggered) return;
       if (notifiedRef.current.has(alert.id)) return;

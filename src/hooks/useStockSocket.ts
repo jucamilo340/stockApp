@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { finnhubSocket } from '@api/websocket';
 import { updateStockPrice } from '@store/Watchlistslice';
 import { useAppDispatch, useAppSelector } from '@store/store';
+import { getRealtimeSymbols } from '@utils/symbolSources';
 
 export function useStockSocket(symbol: string): number | null {
   const dispatch = useAppDispatch();
@@ -25,11 +26,14 @@ export function useStockSocket(symbol: string): number | null {
 }
 
 /**
- * Subscribes to real-time updates for all watchlist symbols at once.
+ * Subscribes to the symbols needed across watchlist and chart sources.
  */
 export function useWatchlistSocket(): void {
   const dispatch = useAppDispatch();
-  const symbols = useAppSelector((state) => state.watchlist.symbols);
+  const watchlistSymbols = useAppSelector((state) => state.watchlist.symbols);
+  const alerts = useAppSelector((state) => state.alerts.list);
+  const symbols = getRealtimeSymbols(watchlistSymbols, alerts);
+  const symbolsKey = symbols.join('|');
 
   useEffect(() => {
     const callbacks: Record<string, (sym: string, price: number) => void> = {};
@@ -47,5 +51,5 @@ export function useWatchlistSocket(): void {
         finnhubSocket.unsubscribe(symbol, callbacks[symbol]);
       });
     };
-  }, [symbols, dispatch]);
+  }, [dispatch, symbolsKey]);
 }

@@ -19,7 +19,12 @@ const StockCard = memo(({ symbol, onPress }: StockCardProps) => {
   const isPositive = percentChange >= 0;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={onPress}
+      activeOpacity={onPress ? 0.8 : 1}
+      disabled={!onPress}
+    >
       <View style={styles.left}>
         <Text style={styles.symbol}>{symbol}</Text>
         <Text style={styles.name} numberOfLines={1}>{name}</Text>

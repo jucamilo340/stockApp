@@ -21,6 +21,7 @@ interface PriceAlertParams {
 export const NotificationService = {
 
   async init(): Promise<string | null> {
+    console.log('aquii')
     if (!Device.isDevice) {
       console.warn('[Notifications] Push notifications require a physical device.');
       return null;

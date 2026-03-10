@@ -6,8 +6,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@auth/useAuth';
 
 export default function LoginScreen() {

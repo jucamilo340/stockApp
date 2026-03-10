@@ -5,14 +5,13 @@ import {
   TextInput,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  FlatList,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -177,12 +176,8 @@ export default function AddAlertScreen() {
             {/* Suggestions dropdown */}
             {showSuggestions && (
               <View style={styles.suggestions}>
-                <FlatList
-                  data={suggestions}
-                  keyExtractor={(item) => item.value}
-                  keyboardShouldPersistTaps="handled"
-                  nestedScrollEnabled
-                  renderItem={({ item }) => (
+                {suggestions.map((item, index) => (
+                  <React.Fragment key={item.value}>
                     <TouchableOpacity
                       style={styles.suggestionItem}
                       onPress={() => handleSelect(item)}
@@ -193,9 +188,9 @@ export default function AddAlertScreen() {
                         {item.label}
                       </Text>
                     </TouchableOpacity>
-                  )}
-                  ItemSeparatorComponent={() => <View style={styles.separator} />}
-                />
+                    {index < suggestions.length - 1 && <View style={styles.separator} />}
+                  </React.Fragment>
+                ))}
               </View>
             )}
           </View>

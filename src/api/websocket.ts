@@ -31,7 +31,7 @@ class FinnhubSocketManager {
 
       this.ws.onmessage = (event: WebSocketMessageEvent) => {
         try {
-          console.log('[FinnhubSocket] Incoming:', event.data);
+
           const data = JSON.parse(event.data);
           if (data.type === 'ping') {
             this.ws?.send(JSON.stringify({ type: 'pong' }));
@@ -79,14 +79,12 @@ class FinnhubSocketManager {
 
   private sendSubscribe(symbol: string): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      console.log(`[FinnhubSocket] Subscribe -> ${symbol}`);
       this.ws.send(JSON.stringify({ type: 'subscribe', symbol }));
     }
   }
 
   private sendUnsubscribe(symbol: string): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      console.log(`[FinnhubSocket] Unsubscribe -> ${symbol}`);
       this.ws.send(JSON.stringify({ type: 'unsubscribe', symbol }));
     }
   }

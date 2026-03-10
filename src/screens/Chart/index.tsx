@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Dimensions,
   TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   VictoryChart,
   VictoryLine,
@@ -15,14 +15,25 @@ import {
   VictoryTheme,
 } from 'victory-native';
 import { useAppSelector } from '@store/store';
+import SymbolSourceDropdown from '@components/SymbolSourceDropdown';
+import { useSymbolQuotes } from '@hooks/useSymbolQuotes';
+import { getSymbolsForSource, SymbolSource } from '@utils/symbolSources';
 import { formatCurrency, formatTime } from '@utils/formatters';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const LINE_COLORS = ['#00C805', '#007AFF', '#FF9F0A', '#FF453A', '#BF5AF2', '#32D74B', '#5AC8FA', '#FF375F'];
+const LINE_COLORS = [
+  '#00C805',
+  '#007AFF',
+  '#FF9F0A',
+  '#FF453A',
+  '#BF5AF2',
+  '#32D74B',
+  '#5AC8FA',
+  '#FF375F',
+];
 const CHART_WINDOW_MS = 3 * 60 * 1000;
 const CHART_INTERVAL_MS = 10 * 1000;
 
-// ─── Bug 1: Hook called inside map() — extracted into its own component ───────
 function LegendList({ symbols, colors }: { symbols: string[]; colors: string[] }) {
   const prices = useAppSelector((state) => state.watchlist.prices);
 
@@ -30,10 +41,15 @@ function LegendList({ symbols, colors }: { symbols: string[]; colors: string[] }
     <>
       {symbols.map((symbol, index) => (
         <View key={symbol} style={styles.legendRow}>
-          <View style={[styles.legendDot, { backgroundColor: colors[index % colors.length] }]} />
+          <View
+            style={[
+              styles.legendDot,
+              { backgroundColor: colors[index % colors.length] },
+            ]}
+          />
           <Text style={styles.legendSymbol}>{symbol}</Text>
           <Text style={styles.legendPrice}>
-            {prices[symbol] ? formatCurrency(prices[symbol]) : '—'}
+            {prices[symbol] ? formatCurrency(prices[symbol]) : '--'}
           </Text>
         </View>
       ))}
@@ -42,34 +58,47 @@ function LegendList({ symbols, colors }: { symbols: string[]; colors: string[] }
 }
 
 export default function ChartScreen() {
-  const symbols = useAppSelector((state) => state.watchlist.symbols);
+  const alerts = useAppSelector((state) => state.alerts.list);
   const history = useAppSelector((state) => state.watchlist.history);
 
-  const [hiddenSymbols, setHiddenSymbols] = useState<Set<string>>(new Set());
+  const [source, setSource] = useState<SymbolSource>('popular');
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+  const symbols = getSymbolsForSource(source, alerts);
+  const symbolsKey = symbols.join('|');
 
-  const toggleSymbol = (symbol: string) => {
-    setHiddenSymbols((prev) => {
-      const next = new Set(prev);
-      next.has(symbol) ? next.delete(symbol) : next.add(symbol);
-      return next;
+  useSymbolQuotes(symbols);
+
+  useEffect(() => {
+    setSelectedSymbol((current) => {
+      if (symbols.length === 0) {
+        return null;
+      }
+
+      return current && symbols.includes(current) ? current : symbols[0];
     });
-  };
+  }, [symbolsKey]);
 
-  const allPrices = symbols.flatMap((s) => (history[s] ?? []).map((p) => p.price));
+  const selectedSymbolIndex = selectedSymbol ? symbols.indexOf(selectedSymbol) : -1;
+  const selectedColor =
+    selectedSymbolIndex >= 0
+      ? LINE_COLORS[selectedSymbolIndex % LINE_COLORS.length]
+      : LINE_COLORS[0];
+
+  const allPrices = selectedSymbol
+    ? (history[selectedSymbol] ?? []).map((point) => point.price)
+    : [];
   const maxPrice = allPrices.length ? Math.max(...allPrices) : 1;
-  const yTickFormat = (t: number) => {
-    if (maxPrice < 0.01) return `$${t.toFixed(6)}`;
-    if (maxPrice < 1)    return `$${t.toFixed(4)}`;
-    if (maxPrice < 100)  return `$${t.toFixed(2)}`;
-    return `$${t.toFixed(0)}`;
+  const yTickFormat = (tick: number) => {
+    if (maxPrice < 0.01) return `$${tick.toFixed(6)}`;
+    if (maxPrice < 1) return `$${tick.toFixed(4)}`;
+    if (maxPrice < 100) return `$${tick.toFixed(2)}`;
+    return `$${tick.toFixed(0)}`;
   };
 
-  const latestPointTime = symbols.reduce((latest, symbol) => {
-    const symbolHistory = history[symbol] ?? [];
-    const lastPoint = symbolHistory[symbolHistory.length - 1];
-    return lastPoint ? Math.max(latest, lastPoint.time) : latest;
-  }, 0);
-  const alignedNow = Math.floor(Date.now() / CHART_INTERVAL_MS) * CHART_INTERVAL_MS;
+  const selectedHistory = selectedSymbol ? history[selectedSymbol] ?? [] : [];
+  const latestPointTime = selectedHistory[selectedHistory.length - 1]?.time ?? 0;
+  const alignedNow =
+    Math.floor(Date.now() / CHART_INTERVAL_MS) * CHART_INTERVAL_MS;
   const chartEndTime = Math.max(alignedNow, latestPointTime);
   const chartStartTime = chartEndTime - CHART_WINDOW_MS;
   const xTickValues = Array.from(
@@ -77,31 +106,33 @@ export default function ChartScreen() {
     (_, index) => chartStartTime + index * CHART_INTERVAL_MS
   );
 
-  const chartData = symbols
-    .filter((s) => !hiddenSymbols.has(s) && (history[s]?.length ?? 0) > 1)
-    .map((symbol, index) => ({
-      symbol,
-      color: LINE_COLORS[index % LINE_COLORS.length],
-      data: (history[symbol] ?? [])
-        .filter((point) => point.time >= chartStartTime && point.time <= chartEndTime)
-        .map((point) => ({
-          x: point.time,
-          y: point.price,
-        })),
-    }))
-    .filter(({ data }) => data.length > 1);
+  const chartData =
+    selectedSymbol == null
+      ? []
+      : selectedHistory
+          .filter((point) => point.time >= chartStartTime && point.time <= chartEndTime)
+          .map((point) => ({
+            x: point.time,
+            y: point.price,
+          }));
 
   if (symbols.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Chart</Text>
+          <View>
+            <Text style={styles.headerTitle}>Chart</Text>
+            <Text style={styles.headerSubtitle}>Live USD Value</Text>
+          </View>
+          <SymbolSourceDropdown value={source} onChange={setSource} />
         </View>
         <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>📉</Text>
+          <Text style={styles.emptyIcon}>CH</Text>
           <Text style={styles.emptyTitle}>No data yet</Text>
           <Text style={styles.emptySubtitle}>
-            Add stocks to your watchlist to see them plotted here in real time
+            {source === 'popular'
+              ? 'Popular symbols will appear here as soon as quotes arrive'
+              : 'Create an alert to plot your alert symbols here'}
           </Text>
         </View>
       </SafeAreaView>
@@ -111,8 +142,11 @@ export default function ChartScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Chart</Text>
-        <Text style={styles.headerSubtitle}>Live USD Value</Text>
+        <View>
+          <Text style={styles.headerTitle}>Chart</Text>
+          <Text style={styles.headerSubtitle}>Live USD Value</Text>
+        </View>
+        <SymbolSourceDropdown value={source} onChange={setSource} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -122,7 +156,7 @@ export default function ChartScreen() {
           contentContainerStyle={styles.toggleRow}
         >
           {symbols.map((symbol, index) => {
-            const isActive = !hiddenSymbols.has(symbol);
+            const isActive = selectedSymbol === symbol;
             const color = LINE_COLORS[index % LINE_COLORS.length];
             return (
               <TouchableOpacity
@@ -130,11 +164,16 @@ export default function ChartScreen() {
                 style={[
                   styles.toggleChip,
                   { borderColor: color },
-                  isActive && { backgroundColor: color + '22' },
+                  isActive && { backgroundColor: `${color}22` },
                 ]}
-                onPress={() => toggleSymbol(symbol)}
+                onPress={() => setSelectedSymbol(symbol)}
               >
-                <View style={[styles.chipDot, { backgroundColor: isActive ? color : '#444' }]} />
+                <View
+                  style={[
+                    styles.chipDot,
+                    { backgroundColor: isActive ? color : '#444' },
+                  ]}
+                />
                 <Text style={[styles.chipText, { color: isActive ? color : '#555' }]}>
                   {symbol}
                 </Text>
@@ -143,7 +182,7 @@ export default function ChartScreen() {
           })}
         </ScrollView>
 
-        {chartData.length > 0 ? (
+        {chartData.length > 1 ? (
           <View style={styles.chartContainer}>
             <VictoryChart
               width={SCREEN_WIDTH - 24}
@@ -160,7 +199,7 @@ export default function ChartScreen() {
                   grid: { stroke: 'transparent' },
                 }}
                 tickValues={xTickValues}
-                tickFormat={(t) => formatTime(t)}
+                tickFormat={(tick) => formatTime(tick)}
               />
               <VictoryAxis
                 dependentAxis
@@ -171,20 +210,18 @@ export default function ChartScreen() {
                 }}
                 tickFormat={yTickFormat}
               />
-              {chartData.map(({ symbol, color, data }) => (
-                <VictoryLine
-                  key={symbol}
-                  data={data}
-                  style={{ data: { stroke: color, strokeWidth: 2 } }}
-                  interpolation="monotoneX"
-                />
-              ))}
+              <VictoryLine
+                data={chartData}
+                style={{ data: { stroke: selectedColor, strokeWidth: 2 } }}
+                interpolation="monotoneX"
+              />
             </VictoryChart>
           </View>
         ) : (
           <View style={styles.noData}>
             <Text style={styles.noDataText}>
-              Waiting for price data...{'\n'}Keep the app open for prices to populate
+              Waiting for price data...{'\n'}Keep the app open for prices to
+              populate
             </Text>
           </View>
         )}
@@ -192,7 +229,6 @@ export default function ChartScreen() {
         <View style={styles.legendContainer}>
           <LegendList symbols={symbols} colors={LINE_COLORS} />
         </View>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -204,10 +240,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A0A14',
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#1E1E2E',
+    zIndex: 20,
   },
   headerTitle: {
     fontSize: 28,
@@ -301,6 +341,7 @@ const styles = StyleSheet.create({
   emptyIcon: {
     fontSize: 56,
     marginBottom: 16,
+    color: '#00C805',
   },
   emptyTitle: {
     fontSize: 22,
