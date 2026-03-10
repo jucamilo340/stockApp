@@ -16,7 +16,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAppDispatch, useAppSelector } from '@store/store';
-import { addAlert } from '@store/alertsSlice';
+import { addAlert, removeAlert } from '@store/alertsSlice';
 import { addSymbol, updateStockPrice } from '@store/Watchlistslice';
 import { finnhubApi, SymbolSearchResult } from '@api/Finnhub';
 
@@ -99,6 +99,21 @@ export default function AddAlertScreen() {
     setValue('symbol', option.value, { shouldValidate: true });
     setQuery(`${option.label} (${option.value})`);
     setShowSuggestions(false);
+  };
+
+  const handleRemoveAlert = (alertId: string, symbol: string) => {
+    Alert.alert(
+      'Delete alert',
+      `Remove the alert for ${symbol}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => dispatch(removeAlert(alertId)),
+        },
+      ]
+    );
   };
 
   const onSubmit = async (data: AlertFormData) => {
@@ -231,13 +246,18 @@ export default function AddAlertScreen() {
             <View style={styles.alertsSection}>
               <Text style={styles.alertsTitle}>Active Alerts ({alerts.length})</Text>
               {alerts.map((alert) => (
-                <View key={alert.id} style={styles.alertItem}>
+                <TouchableOpacity
+                  key={alert.id}
+                  style={styles.alertItem}
+                  activeOpacity={0.8}
+                  onPress={() => handleRemoveAlert(alert.id, alert.symbol)}
+                >
                   <Text style={styles.alertSymbol}>{alert.symbol}</Text>
                   <Text style={styles.alertPrice}>${alert.targetPrice.toFixed(2)}</Text>
                   {alert.triggered && (
                     <Text style={styles.alertTriggered}>✓ Triggered</Text>
                   )}
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           )}
